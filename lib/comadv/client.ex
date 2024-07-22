@@ -93,10 +93,14 @@ defmodule Comadv.Client do
     {next_player, game_state, world} = handle_key(width, height, player, key, game_state, world)
     next_position = {next_player.x, next_player.y}
     {x, y} = next_position
+    next_cell = Matrix.elem(world, y, x)
 
     cond do
-      loses(width, height, next_position, Matrix.elem(world, y, x)) ->
+      loses(width, height, next_position) ->
         {player, %Comadv.GameState{game_state | game_over: true}, world}
+
+      collide(next_position, next_cell) ->
+        {player, game_state, world}
 
       true ->
         {move(next_player, next_position), game_state, world}
@@ -107,8 +111,11 @@ defmodule Comadv.Client do
     %{player | x: x, y: y}
   end
 
-  defp loses(width, height, pos, cell) do
-    hits_wall(width, height, pos) || hits_block(pos, cell)
+  defp loses(width, height, pos) do
+    hits_wall(width, height, pos)
+  end
+  defp collide(pos, cell) do
+    hits_block(pos, cell)
   end
 
   defp hits_wall(_width, _height, {0, _y}), do: true
