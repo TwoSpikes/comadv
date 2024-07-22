@@ -37,35 +37,69 @@ defmodule Comadv.Client do
   end
 
   defp schedule_next_tick() do
-    timer = Process.send_after(self(), :tick, @tick)
+    _timer = Process.send_after(self(), :tick, @tick)
   end
 
-  defp handle_key(%{x: x, y: y} = player, ?h) do
-    %{player | x: x - 1, y: y, dir: :left}
+  defp handle_key(_width, _height, %{x: x, y: y} = player, ?h, game_state, world) do
+    {%{player | x: x - 1, y: y, dir: :left}, game_state, world}
   end
-  defp handle_key(%{x: x, y: y} = player, ?j) do
-    %{player | x: x, y: y + 1, dir: :down}
+  defp handle_key(_width, _height, %{x: x, y: y} = player, ?j, game_state, world) do
+    {%{player | x: x, y: y + 1, dir: :down}, game_state, world}
   end
-  defp handle_key(%{x: x, y: y} = player, ?k) do
-    %{player | x: x, y: y - 1, dir: :up}
+  defp handle_key(_width, _height, %{x: x, y: y} = player, ?k, game_state, world) do
+    {%{player | x: x, y: y - 1, dir: :up}, game_state, world}
   end
-  defp handle_key(%{x: x, y: y} = player, ?l) do
-    %{player | x: x + 1, y: y, dir: :right}
+  defp handle_key(_width, _height,%{x: x, y: y} = player, ?l, game_state, world) do
+    {%{player | x: x + 1, y: y, dir: :right}, game_state, world}
   end
-  defp handle_key(player, _) do
-    player
+  defp handle_key(_width, _height, %{x: x, y: y} = player, ?a, game_state, world) do
+    {%{player | x: x - 1, y: y, dir: :left}, game_state, world}
+  end
+  defp handle_key(_width, _height, %{x: x, y: y} = player, ?s, game_state, world) do
+    {%{player | x: x, y: y + 1, dir: :down}, game_state, world}
+  end
+  defp handle_key(_width, _height, %{x: x, y: y} = player, ?w, game_state, world) do
+    {%{player | x: x, y: y - 1, dir: :up}, game_state, world}
+  end
+  defp handle_key(_width, _height,%{x: x, y: y} = player, ?d, game_state, world) do
+    {%{player | x: x + 1, y: y, dir: :right}, game_state, world}
+  end
+  defp handle_key(width, height, %{x: x, y: y} = player, ?p, game_state, world) do
+    {x, y} = pointing_to(player)
+    if not hits_wall(width, height, {x, y}) do
+      world = Matrix.set(world, y, x, "*")
+      {player, game_state, world}
+    else
+      {player, game_state, world}
+    end
+  end
+  defp handle_key(width, height, %{x: x, y: y} = player, ?x, game_state, world) do
+    {x, y} = pointing_to(player)
+    if not hits_wall(width, height, {x, y}) do
+      world = Matrix.set(world, y, x, 0)
+      {player, game_state, world}
+    else
+      {player, game_state, world}
+    end
+  end
+  defp handle_key(_width, _height, player, ?q, game_state, world) do
+    {player, %{game_state | game_over: true}, world}
+  end
+  defp handle_key(_width, _height, player, _, game_state, world) do
+    {player, game_state, world}
   end
 
-  defp turn(width, height, game_state, player, key) do
-    next_player = handle_key(player, key)
+  defp turn(width, height, game_state, player, key, world) do
+    {next_player, game_state, world} = handle_key(width, height, player, key, game_state, world)
     next_position = {next_player.x, next_player.y}
+    {x, y} = next_position
 
     cond do
-      loses(width, height, next_position) ->
-        {player, %Comadv.GameState{game_state | game_over: true}}
+      loses(width, height, next_position, Matrix.elem(world, y, x)) ->
+        {player, %Comadv.GameState{game_state | game_over: true}, world}
 
       true ->
-        {move(next_player, next_position), game_state}
+        {move(next_player, next_position), game_state, world}
     end
   end
 
@@ -73,8 +107,8 @@ defmodule Comadv.Client do
     %{player | x: x, y: y}
   end
 
-  defp loses(width, height, pos) do
-    hits_wall(width, height, pos)
+  defp loses(width, height, pos, cell) do
+    hits_wall(width, height, pos) || hits_block(pos, cell)
   end
 
   defp hits_wall(_width, _height, {0, _y}), do: true
@@ -82,24 +116,43 @@ defmodule Comadv.Client do
   defp hits_wall(width, _height, {x, _y}) when x == width - 1, do: true
   defp hits_wall(_width, height, {_x, y}) when y == height - 2, do: true
   defp hits_wall(_width, _height, _pos), do: false
+  defp hits_block({x, y}, cell) do
+    case cell do
+      0 -> false
+      _ -> true
+    end
+  end
 
-  defp next_state(player, game_state) do
-    {player, game_state}
+  defp next_state(player, game_state, world) do
+    {player, game_state, world}
+  end
+
+  defp pointing_to(%{x: x, y: y, dir: :left} = _player) do
+    {x - 1, y}
+  end
+  defp pointing_to(%{x: x, y: y, dir: :right} = _player) do
+    {x + 1, y}
+  end
+  defp pointing_to(%{x: x, y: y, dir: :down} = _player) do
+    {x, y + 1}
+  end
+  defp pointing_to(%{x: x, y: y, dir: :up} = _player) do
+    {x, y - 1}
   end
 
   defp loop(game_state, width, height, world, player) do
-    {player, game_state} =
+    {player, game_state, world} =
       receive do
         {:ex_ncurses, :key, key} ->
-          {player, game_state} = turn(width, height, game_state, player, key)
-          Comadv.UI.draw(width, height, player, game_state)
-          {player, game_state}
+          {player, game_state, world} = turn(width, height, game_state, player, key, world)
+          Comadv.UI.draw(width, height, player, game_state, world)
+          {player, game_state, world}
 
         :tick ->
-          {player, game_state} = next_state(player, game_state)
-          Comadv.UI.draw(width, height, player, game_state)
+          {player, game_state, world} = next_state(player, game_state, world)
+          Comadv.UI.draw(width, height, player, game_state, world)
           schedule_next_tick()
-          {player, game_state}
+          {player, game_state, world}
       end
 
     if game_state.game_over != true do

@@ -10,6 +10,17 @@ defmodule Comadv.UI do
     %{game_state | win: win}
   end
 
+  defp draw_world(world, win) do
+    for {line, i} <- Enum.with_index(world) do
+      for {cell, j} <- Enum.with_index(line) do
+        if cell != 0 do
+          ExNcurses.wmove(win, i, j)
+          ExNcurses.waddstr(win, cell)
+        end
+      end
+    end
+  end
+
   defp draw_player(%{x: x, y: y, dir: :left}, win) do
     ExNcurses.wmove(win, y, x)
     ExNcurses.waddstr(win, "<")
@@ -27,11 +38,12 @@ defmodule Comadv.UI do
     ExNcurses.waddstr(win, ">")
   end
 
-  def draw(width, height, player, game_state) do
+  def draw(_width, _height, player, game_state, world) do
     ExNcurses.clear()
     ExNcurses.mvaddstr(0, 2, "Comadv")
     ExNcurses.wclear(game_state.win)
     ExNcurses.wborder(game_state.win)
+    draw_world(world, game_state.win)
     draw_player(player, game_state.win)
     ExNcurses.refresh()
     ExNcurses.wrefresh(game_state.win)
