@@ -6,7 +6,8 @@ end
 
 defmodule Comadv.GameState do
   defstruct game_over: false,
-            win: nil
+            win: nil,
+            msg: ""
 end
 
 defmodule Comadv.Client do
@@ -82,6 +83,43 @@ defmodule Comadv.Client do
       {player, game_state, world}
     end
   end
+  defp get_command(command) do
+    receive do
+      {:ex_ncurses, :key, c} ->
+        case c do
+          10 ->
+            command
+          7 ->
+            ""
+          127 ->
+            if command != "" do
+              ExNcurses.move(ExNcurses.gety(), ExNcurses.getx()-1)
+              ExNcurses.addstr(" ")
+              ExNcurses.move(ExNcurses.gety(), ExNcurses.getx()-1)
+              ExNcurses.refresh()
+              get_command(String.slice(command, 0..-2//1))
+            else
+              get_command("")
+            end
+          _ ->
+            ExNcurses.addstr(to_string [c])
+            ExNcurses.refresh()
+            get_command("#{command}#{to_string [c]}")
+        end
+    end
+  end
+  defp handle_key(width, height, %{x: x, y: y} = player, ?/, game_state, world) do
+    ExNcurses.move(height, 0)
+    ExNcurses.addstr("/")
+    ExNcurses.refresh()
+    command = get_command("")
+    case command do
+      n when n in ["d","die"] ->
+        {player, %{game_state | game_over: true}, world}
+      _ ->
+        {player, %{game_state | msg: "Unknown command: #{command}"}, world}
+    end
+  end
   defp handle_key(_width, _height, player, ?q, game_state, world) do
     {player, %{game_state | game_over: true}, world}
   end
@@ -146,6 +184,11 @@ defmodule Comadv.Client do
   defp pointing_to(%{x: x, y: y, dir: :up} = _player) do
     {x, y - 1}
   end
+  defp game_over(height) do
+    ExNcurses.move(height, 0)
+    ExNcurses.addstr("Game over!")
+    ExNcurses.refresh()
+  end
 
   defp loop(game_state, width, height, world, player) do
     {player, game_state, world} =
@@ -165,9 +208,7 @@ defmodule Comadv.Client do
     if game_state.game_over != true do
       loop(game_state, width, height, world, player)
     else
-      ExNcurses.move(height, 0)
-      ExNcurses.addstr("Game over!")
-      ExNcurses.refresh()
+      game_over(height)
     end
   end
 end

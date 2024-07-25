@@ -5,6 +5,7 @@ defmodule Comadv.UI do
     ExNcurses.listen()
     ExNcurses.noecho()
     ExNcurses.keypad()
+    #ExNcurses.raw()
     ExNcurses.curs_set(0)
 
     %{game_state | win: win}
@@ -38,13 +39,15 @@ defmodule Comadv.UI do
     ExNcurses.waddstr(win, ">")
   end
 
-  def draw(_width, _height, player, game_state, world) do
+  def draw(_width, height, player, game_state, world) do
     ExNcurses.clear()
     ExNcurses.mvaddstr(0, 2, "Comadv")
     ExNcurses.wclear(game_state.win)
     ExNcurses.wborder(game_state.win)
     draw_world(world, game_state.win)
     draw_player(player, game_state.win)
+    ExNcurses.move(height, 0)
+    ExNcurses.addstr(game_state.msg)
     ExNcurses.refresh()
     ExNcurses.wrefresh(game_state.win)
   end
